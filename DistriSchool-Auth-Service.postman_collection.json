@@ -1,0 +1,694 @@
+{
+	"info": {
+		"_postman_id": "distrischool-auth-service",
+		"name": "DistriSchool Auth Service",
+		"description": "Collection for testing the DistriSchool Authentication Microservice API endpoints.\n\n## Base URL\n- Development: http://localhost:8080\n- Production: https://api.distrischool.com\n\n## Authentication\nThis service uses JWT Bearer tokens for authentication. After login, use the token in the Authorization header:\n`Authorization: Bearer <your-jwt-token>`\n\n## User Roles\n- ADMIN: Administrador do Sistema\n- TEACHER: Professor\n- STUDENT: Estudante/Aluno\n- PARENT: Pai/Responsável\n\n## Environment Variables\n- `baseUrl`: Base URL for the API (default: http://localhost:8080)\n- `authToken`: JWT token for authenticated requests\n- `userId`: User ID for testing user-specific endpoints",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"health"
+							]
+						},
+						"description": "Check if the authentication service is running properly"
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.success && response.data && response.data.token) {",
+									"        pm.environment.set('authToken', response.data.token);",
+									"        pm.environment.set('userId', response.data.user.id);",
+									"        pm.environment.set('userEmail', response.data.user.email);",
+									"        pm.environment.set('userRoles', JSON.stringify(response.data.user.roles));",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@distrischool.com\",\n  \"password\": \"Admin123!@#\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Authenticate user with email and password. Returns JWT token and user information."
+					},
+					"response": []
+				},
+				{
+					"name": "Register Student",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"student@example.com\",\n  \"password\": \"Student123!@#\",\n  \"confirmPassword\": \"Student123!@#\",\n  \"firstName\": \"João\",\n  \"lastName\": \"Silva\",\n  \"phone\": \"+5585999999999\",\n  \"documentNumber\": \"12345678901\",\n  \"roles\": [\"STUDENT\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Register a new student user. Email verification will be required."
+					},
+					"response": []
+				},
+				{
+					"name": "Register Teacher",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"teacher@example.com\",\n  \"password\": \"Teacher123!@#\",\n  \"confirmPassword\": \"Teacher123!@#\",\n  \"firstName\": \"Maria\",\n  \"lastName\": \"Santos\",\n  \"phone\": \"+5585888888888\",\n  \"documentNumber\": \"98765432100\",\n  \"roles\": [\"TEACHER\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Register a new teacher user. Email verification will be required."
+					},
+					"response": []
+				},
+				{
+					"name": "Register Parent",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"parent@example.com\",\n  \"password\": \"Parent123!@#\",\n  \"confirmPassword\": \"Parent123!@#\",\n  \"firstName\": \"Carlos\",\n  \"lastName\": \"Oliveira\",\n  \"phone\": \"+5585777777777\",\n  \"documentNumber\": \"11122233344\",\n  \"roles\": [\"PARENT\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Register a new parent user. Email verification will be required."
+					},
+					"response": []
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{userEmail}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/forgot-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"forgot-password"
+							]
+						},
+						"description": "Request password reset for a user. A reset token will be sent to the email."
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"your-reset-token-here\",\n  \"newPassword\": \"NewPassword123!@#\",\n  \"confirmPassword\": \"NewPassword123!@#\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/reset-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"reset-password"
+							]
+						},
+						"description": "Reset password using the token received via email."
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Email (POST)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"your-verification-token-here\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/verify-email",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"verify-email"
+							]
+						},
+						"description": "Verify email using the token received via email (POST method)."
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Email (GET)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/verify-email/your-verification-token-here",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"verify-email",
+								"your-verification-token-here"
+							]
+						},
+						"description": "Verify email using the token received via email (GET method - for email links)."
+					},
+					"response": []
+				}
+			],
+			"description": "Authentication endpoints for login, registration, password recovery, and email verification."
+		},
+		{
+			"name": "User Management",
+			"item": [
+				{
+					"name": "Get User by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"{{userId}}"
+							]
+						},
+						"description": "Get user information by ID. Requires authentication. Users can only access their own data unless they are ADMIN or TEACHER."
+					},
+					"response": []
+				},
+				{
+					"name": "Get User by Email (Admin Only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/email/{{userEmail}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"email",
+								"{{userEmail}}"
+							]
+						},
+						"description": "Get user information by email. Only ADMIN users can access this endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Users (Admin Only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users"
+							]
+						},
+						"description": "Get all active users in the system. Only ADMIN users can access this endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Users by Role - ADMIN",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/role/ADMIN",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"role",
+								"ADMIN"
+							]
+						},
+						"description": "Get all users with ADMIN role. Requires ADMIN or TEACHER role."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Users by Role - TEACHER",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/role/TEACHER",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"role",
+								"TEACHER"
+							]
+						},
+						"description": "Get all users with TEACHER role. Requires ADMIN or TEACHER role."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Users by Role - STUDENT",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/role/STUDENT",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"role",
+								"STUDENT"
+							]
+						},
+						"description": "Get all users with STUDENT role. Requires ADMIN or TEACHER role."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Users by Role - PARENT",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/role/PARENT",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"role",
+								"PARENT"
+							]
+						},
+						"description": "Get all users with PARENT role. Requires ADMIN or TEACHER role."
+					},
+					"response": []
+				},
+				{
+					"name": "Deactivate User (Admin Only)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/{{userId}}?deletedBy=ADMIN",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"{{userId}}"
+							],
+							"query": [
+								{
+									"key": "deletedBy",
+									"value": "ADMIN"
+								}
+							]
+						},
+						"description": "Deactivate a user account. Only ADMIN users can perform this action."
+					},
+					"response": []
+				},
+				{
+					"name": "Reactivate User (Admin Only)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/{{userId}}/reactivate",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"users",
+								"{{userId}}",
+								"reactivate"
+							]
+						},
+						"description": "Reactivate a previously deactivated user account. Only ADMIN users can perform this action."
+					},
+					"response": []
+				}
+			],
+			"description": "User management endpoints for CRUD operations. Most endpoints require authentication and specific roles."
+		},
+		{
+			"name": "Health & Monitoring",
+			"item": [
+				{
+					"name": "Application Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "General application health check endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "API Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"health"
+							]
+						},
+						"description": "API-specific health check endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Actuator Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/actuator/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"actuator",
+								"health"
+							]
+						},
+						"description": "Spring Boot Actuator health endpoint with detailed system information."
+					},
+					"response": []
+				},
+				{
+					"name": "Actuator Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/actuator/info",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"actuator",
+								"info"
+							]
+						},
+						"description": "Spring Boot Actuator info endpoint with application information."
+					},
+					"response": []
+				},
+				{
+					"name": "Actuator Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/actuator/metrics",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"actuator",
+								"metrics"
+							]
+						},
+						"description": "Spring Boot Actuator metrics endpoint with application metrics."
+					},
+					"response": []
+				}
+			],
+			"description": "Health check and monitoring endpoints for system status and metrics."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set default base URL if not already set",
+					"if (!pm.environment.get('baseUrl')) {",
+					"    pm.environment.set('baseUrl', 'http://localhost:8080');",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test to check response format",
+					"pm.test('Response time is less than 5000ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});",
+					"",
+					"// Check if response is JSON (for non-binary responses)",
+					"if (pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').includes('application/json')) {",
+					"    pm.test('Response is valid JSON', function () {",
+					"        pm.response.to.be.json;",
+					"    });",
+					"    ",
+					"    // Check API response format for successful responses",
+					"    if (pm.response.code >= 200 && pm.response.code < 300) {",
+					"        const response = pm.response.json();",
+					"        if (response.hasOwnProperty('success')) {",
+					"            pm.test('API response has success field', function () {",
+					"                pm.expect(response.success).to.be.a('boolean');",
+					"            });",
+					"            ",
+					"            pm.test('API response has message field', function () {",
+					"                pm.expect(response.message).to.be.a('string');",
+					"            });",
+					"        }",
+					"    }",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	]
+}

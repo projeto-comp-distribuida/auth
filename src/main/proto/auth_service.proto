@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package com.distrischool.auth.grpc;
+
+option java_package = "com.distrischool.template.grpc";
+option java_outer_classname = "AuthServiceProto";
+option java_multiple_files = true;
+
+// Serviço de autenticação gRPC para validação de JWT
+service AuthService {
+  // Valida um token JWT e retorna informações do usuário
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  
+  // Obtém informações do usuário pelo ID
+  rpc GetUserById(GetUserByIdRequest) returns (GetUserByIdResponse);
+  
+  // Verifica se um usuário tem uma role específica
+  rpc HasRole(HasRoleRequest) returns (HasRoleResponse);
+  
+  // Obtém todas as roles de um usuário
+  rpc GetUserRoles(GetUserRolesRequest) returns (GetUserRolesResponse);
+  
+  // Health check para o serviço
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Request para validação de token
+message ValidateTokenRequest {
+  string token = 1;
+  string service_name = 2; // Nome do serviço que está fazendo a validação
+}
+
+// Response para validação de token
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string email = 3;
+  string username = 4;
+  repeated string roles = 5;
+  int64 expires_at = 6; // Timestamp de expiração
+  string error_message = 7; // Mensagem de erro se inválido
+}
+
+// Request para obter usuário por ID
+message GetUserByIdRequest {
+  string user_id = 1;
+}
+
+// Response para obter usuário por ID
+message GetUserByIdResponse {
+  bool found = 1;
+  string user_id = 2;
+  string email = 3;
+  string username = 4;
+  string first_name = 5;
+  string last_name = 6;
+  bool active = 7;
+  repeated string roles = 8;
+  int64 created_at = 9;
+  int64 updated_at = 10;
+  string error_message = 11;
+}
+
+// Request para verificar role
+message HasRoleRequest {
+  string user_id = 1;
+  string role = 2;
+}
+
+// Response para verificar role
+message HasRoleResponse {
+  bool has_role = 1;
+  string error_message = 2;
+}
+
+// Request para obter roles do usuário
+message GetUserRolesRequest {
+  string user_id = 1;
+}
+
+// Response para obter roles do usuário
+message GetUserRolesResponse {
+  repeated string roles = 1;
+  string error_message = 2;
+}
+
+// Request para health check
+message HealthCheckRequest {
+  string service_name = 1;
+}
+
+// Response para health check
+message HealthCheckResponse {
+  bool healthy = 1;
+  string message = 2;
+  int64 timestamp = 3;
+}

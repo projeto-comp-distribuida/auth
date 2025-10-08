@@ -1,10 +1,10 @@
 spring:
   application:
-    name: microservice-template
+    name: auth-service
   
   # Configuração do DataSource (PostgreSQL)
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/distrischool_template}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/distrischool_auth}
     username: ${SPRING_DATASOURCE_USERNAME:distrischool}
     password: ${SPRING_DATASOURCE_PASSWORD:distrischool123}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
@@ -91,6 +91,19 @@ server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful
 
+# Configuração do gRPC
+grpc:
+  server:
+    port: ${GRPC_SERVER_PORT:9090}
+    shutdown-grace-period: 30s
+  client:
+    auth-service:
+      address: 'static://localhost:9090'
+      negotiation-type: plaintext
+      enable-keep-alive: true
+      keep-alive-without-calls: true
+      max-inbound-message-size: 4194304
+
 # Configurações do Actuator
 management:
   endpoints:
@@ -147,7 +160,35 @@ microservice:
   version: 1.0.0
   kafka:
     topics:
-      # Defina seus tópicos aqui conforme os requisitos do DistriSchool
-      # Exemplos: student.created, teacher.assigned, schedule.updated, etc.
+      # Tópicos específicos de autenticação
+      auth-user-created: distrischool.auth.user.created
+      auth-user-logged: distrischool.auth.user.logged
+      auth-user-updated: distrischool.auth.user.updated
+      auth-user-deactivated: distrischool.auth.user.deactivated
+      auth-password-changed: distrischool.auth.user.password.changed
+      
+      # Tópicos de eventos gerais (para compatibilidade)
+      user-created: distrischool.user.created
+      user-logged: distrischool.user.logged
+      user-updated: distrischool.user.updated
+      user-deleted: distrischool.user.deleted
+      
+      # Tópicos de exemplo (para KafkaConfig)
       example-event: distrischool.example.event
       example-command: distrischool.example.command
+
+# Configurações de autenticação
+app:
+  auth:
+    # Configurações Auth0 (OAuth2) - Auth0 gerencia completamente os JWT tokens
+    # Auth0 handles: passwords, email verification, password reset, MFA, login attempts
+    auth0:
+      enabled: ${AUTH0_ENABLED:false}
+      domain: ${AUTH0_DOMAIN}
+      client-id: ${AUTH0_CLIENT_ID}
+      client-secret: ${AUTH0_CLIENT_SECRET}
+      audience: ${AUTH0_AUDIENCE}
+      connection: ${AUTH0_CONNECTION:Username-Password-Authentication}
+    
+    # CORS
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
