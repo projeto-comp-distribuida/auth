@@ -1,0 +1,169 @@
+version: '3.8'
+
+# Docker Compose para desenvolvimento local COM hot reloading ⚡
+# Use: docker-compose -f docker-compose-dev.yml up
+# Ou use o script: ./scripts/dev-docker.sh
+# 
+# Recursos:
+# - Hot reloading automático (mudanças em src/ são detectadas)
+# - Debug remoto na porta 5005
+# - LiveReload na porta 35729
+# 
+# IMPORTANTE: Este arquivo é APENAS para desenvolvimento local
+# Produção roda em Kubernetes (Azure AKS), não em Docker Compose
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: distrischool_template
+      POSTGRES_USER: distrischool
+      POSTGRES_PASSWORD: distrischool123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - distrischool-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U distrischool -d distrischool_template"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - distrischool-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  # Zookeeper - Necessário para o Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - distrischool-network
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - distrischool-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # Kafka UI (Opcional - Para visualizar tópicos e mensagens)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - distrischool-network
+
+  # Microserviço Template - Ambiente de Desenvolvimento com Hot Reloading
+  microservice-template-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    container_name: microservice-template-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+      - "5005:5005"   # Porta para debug remoto
+      - "35729:35729" # Porta para LiveReload
+    environment:
+      SERVER_PORT: 8080
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DEVTOOLS_RESTART_ENABLED: "true"
+      SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "true"
+      SPRING_DEVTOOLS_RESTART_POLL_INTERVAL: "1000"
+      SPRING_DEVTOOLS_RESTART_QUIET_PERIOD: "400"
+      # Configurações do PostgreSQL
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/distrischool_template
+      SPRING_DATASOURCE_USERNAME: distrischool
+      SPRING_DATASOURCE_PASSWORD: distrischool123
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      # Configurações do Redis
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ""
+      # Configurações do Flyway
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+    volumes:
+      # Monta o código fonte para hot reloading
+      - ./src:/app/src:rw
+      # Monta o pom.xml para detectar mudanças de dependências
+      - ./pom.xml:/app/pom.xml:rw
+      # Cache do Maven para não baixar dependências toda vez
+      - maven-cache:/root/.m2
+    networks:
+      - distrischool-network
+    # Remove o healthcheck para facilitar o desenvolvimento
+    # O Spring Boot DevTools pode reiniciar frequentemente
+
+networks:
+  distrischool-network:
+    driver: bridge
+
+volumes:
+  maven-cache:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+

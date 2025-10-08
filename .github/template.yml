@@ -1,0 +1,16 @@
+# Template configuration for GitHub
+name: DistriSchool Microservice Template
+description: Template base para criação de microserviços Spring Boot com Kafka, Docker e Kubernetes
+tags:
+  - spring-boot
+  - microservices
+  - kafka
+  - kubernetes
+  - docker
+  - java
+  - distributed-systems
+categories:
+  - microservices
+  - backend
+  - distributed-systems
+

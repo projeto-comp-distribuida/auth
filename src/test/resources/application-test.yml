@@ -1,0 +1,16 @@
+# Configurações para testes
+spring:
+  application:
+    name: microservice-template-test
+  
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+  
+  autoconfigure:
+    exclude:
+      - org.springframework.cloud.netflix.eureka.EurekaClientAutoConfiguration
+
+logging:
+  level:
+    com.distrischool: DEBUG
+

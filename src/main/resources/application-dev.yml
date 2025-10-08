@@ -1,0 +1,25 @@
+# Configurações específicas para desenvolvimento
+spring:
+  devtools:
+    restart:
+      enabled: true
+      additional-paths: src/main/java
+      exclude: static/**,public/**,resources/**,META-INF/maven/**,META-INF/resources/**
+      poll-interval: 1000
+      quiet-period: 400
+    livereload:
+      enabled: true
+      port: 35729
+    remote:
+      restart:
+        enabled: true
+      debug:
+        enabled: true
+      secret: mysecret
+
+# Configurações de logging para desenvolvimento
+logging:
+  level:
+    org.springframework.boot.devtools: DEBUG
+    com.distrischool.template: DEBUG
+    root: INFO

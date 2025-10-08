@@ -1,0 +1,188 @@
+---
+alwaysApply: true
+---
+
+Arquitetura da Solução
+
+Backend: Microsserviços (ex.: school-core-service para gestão de alunos/turmas, notification-service para envio de mensagens). Cada serviço usa Spring Boot com Spring Data JPA e Spring Kafka.
+
+Mensageria (Kafka): Tópicos como student.created, notification.sent usados para comunicação assíncrona.
+
+Frontend: React + Vite, baseado em componentes e páginas.
+
+Banco de Dados: PostgreSQL com Flyway para migrações.
+
+Orquestração e Containers: Todos os serviços (backend, frontend, Kafka, DB) rodam em Docker e são implantados no Azure Kubernetes Service (AKS).
+
+Funcionalidades e Requisitos
+Autenticação e Autorização
+
+Funcionalidades:
+
+Cadastro/login de usuários (alunos, professores, admins, pais).
+
+Login via email/senha ou OAuth2.
+
+JWT para autenticação.
+
+Recuperação de senha.
+
+Perfis de acesso: admin, teacher, student, parent.
+
+Requisitos Funcionais:
+
+Verificação de email via link.
+
+Kafka: publica eventos user.logged para auditoria.
+
+Requisitos Não Funcionais:
+
+Resposta < 2s para login.
+
+Criptografia de senhas com BCrypt.
+
+Suporte a PT-BR e EN.
+
+Integrações:
+
+Spring Boot (Spring Security OAuth2/JWT).
+
+React/Vite (formulários responsivos com validação client-side).
+
+LGPD compliance (APIs seguras).
+
+Gestão de Alunos
+
+Funcionalidades:
+
+CRUD de alunos.
+
+Busca por matrícula, nome, turma.
+
+Upload de documentos.
+
+Histórico acadêmico integrado.
+
+Campos: nome, data nascimento, endereço, contato.
+
+Requisitos Funcionais:
+
+Exportação de listas (PDF/CSV).
+
+Integrações:
+
+Spring Boot (Spring Data JPA).
+
+Kafka: student.created.
+
+React/Vite: tabelas interativas (Material UI DataGrid).
+
+Gestão de Professores
+
+Funcionalidades:
+
+Cadastro/edição de professores.
+
+Atribuição de disciplinas/turmas.
+
+Visualização de horários.
+
+Campos: nome, qualificação, contato.
+
+Requisitos Funcionais:
+
+Relatórios de desempenho.
+
+Notificações de atribuições.
+
+Integrações:
+
+Kafka: teacher.assigned.
+
+React/Vite: calendário (FullCalendar).
+
+Spring Boot: APIs REST.
+
+Gestão de Turmas e Horários
+
+Funcionalidades:
+
+Criação de turmas/disciplinas.
+
+Atribuição de alunos/professores.
+
+Calendário escolar.
+
+Requisitos Funcionais:
+
+Suporte a múltiplos turnos.
+
+Detecção de conflitos.
+
+Importação via Excel.
+
+Integrações:
+
+Kafka: schedule.updated.
+
+React/Vite: calendário interativo.
+
+Spring Boot: Spring Web APIs.
+
+Registro de Presenças
+
+Funcionalidades:
+
+Chamada diária.
+
+Relatórios de faltas.
+
+Notificações para pais.
+
+Requisitos Funcionais:
+
+Suporte a biometria/QR Code.
+
+Percentual de presença.
+
+Histórico por ano letivo.
+
+Integrações:
+
+Kafka: attendance.recorded.
+
+React/Vite: formulários simplificados.
+
+Spring Boot: REST APIs + Scheduler.
+
+Gestão de Notas e Avaliações
+
+Funcionalidades:
+
+Registro de notas e avaliações.
+
+Relatórios consolidados.
+
+Requisitos Funcionais:
+
+Interface mobile-friendly.
+
+Backup diário.
+
+Requisitos Não Funcionais (Gerais)
+
+Interface responsiva.
+
+Criptografia de dados.
+
+Suporte a múltiplas escolas (>10.000 alunos).
+
+WebSockets para atualizações em tempo real.
+
+Logs de auditoria.
+
+Integração com Google Calendar.
+
+99% uptime garantido.
+
+Escalabilidade garantida via Azure Kubernetes Service (AKS).

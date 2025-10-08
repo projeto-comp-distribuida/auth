@@ -1,0 +1,13 @@
+# Perfil para execução no Docker Compose
+spring:
+  application:
+    name: microservice-template
+  
+  kafka:
+    bootstrap-servers: kafka:29092
+
+logging:
+  level:
+    com.distrischool: INFO
+    org.springframework.kafka: WARN
+
