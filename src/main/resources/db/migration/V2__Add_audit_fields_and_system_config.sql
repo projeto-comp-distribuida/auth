@@ -2,18 +2,26 @@
 -- Criada em: 2024-01-02
 -- Descrição: Adiciona campos de auditoria e soft delete
 
--- Adicionar campos de auditoria
-ALTER TABLE example_entity 
-ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
-ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
-ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE,
-ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255);
+-- Adicionar campos de auditoria (apenas se a tabela example_entity existir - migração legada de template)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'example_entity'
+    ) THEN
+        ALTER TABLE example_entity 
+            ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE,
+            ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255);
 
--- Comentários nos novos campos
-COMMENT ON COLUMN example_entity.created_by IS 'Usuário que criou o registro';
-COMMENT ON COLUMN example_entity.updated_by IS 'Usuário que fez a última atualização';
-COMMENT ON COLUMN example_entity.deleted_at IS 'Data e hora da exclusão lógica';
-COMMENT ON COLUMN example_entity.deleted_by IS 'Usuário que fez a exclusão lógica';
+        -- Comentários nos novos campos
+        COMMENT ON COLUMN example_entity.created_by IS 'Usuário que criou o registro';
+        COMMENT ON COLUMN example_entity.updated_by IS 'Usuário que fez a última atualização';
+        COMMENT ON COLUMN example_entity.deleted_at IS 'Data e hora da exclusão lógica';
+        COMMENT ON COLUMN example_entity.deleted_by IS 'Usuário que fez a exclusão lógica';
+    END IF;
+END $$;
 
 -- Criar função para atualizar automaticamente o campo updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -24,12 +32,20 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Criar trigger para atualizar updated_at automaticamente
-DROP TRIGGER IF EXISTS update_example_entity_updated_at ON example_entity;
-CREATE TRIGGER update_example_entity_updated_at
-    BEFORE UPDATE ON example_entity
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Criar trigger para atualizar updated_at automaticamente (somente se a tabela existir)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'example_entity'
+    ) THEN
+        DROP TRIGGER IF EXISTS update_example_entity_updated_at ON example_entity;
+        CREATE TRIGGER update_example_entity_updated_at
+            BEFORE UPDATE ON example_entity
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
 
 -- Criar tabela de configurações do sistema
 CREATE TABLE IF NOT EXISTS system_config (
