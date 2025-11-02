@@ -73,5 +73,28 @@ public class AuthController {
                 .build()
             );
     }
+
+    /**
+     * Endpoint interno para criar usuário (chamado por outros serviços)
+     * Não requer senha, gera uma senha temporária
+     * 
+     * @param request dados do usuário a ser criado
+     * @return informações do usuário criado
+     */
+    @PostMapping("/internal/users")
+    @Timed(value = "auth.internal.createUser", description = "Time taken to create user internally")
+    public ResponseEntity<ApiResponse<AuthResponse>> createUserInternal(@RequestBody com.distrischool.template.dto.auth.CreateUserInternalRequest request) {
+        log.info("POST /api/v1/auth/internal/users - Email: {}", request.getEmail());
+        
+        AuthResponse authResponse = authService.createUserInternal(request);
+        
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.<AuthResponse>builder()
+                .success(true)
+                .message("Usuário criado com sucesso")
+                .data(authResponse)
+                .build()
+            );
+    }
 }
 

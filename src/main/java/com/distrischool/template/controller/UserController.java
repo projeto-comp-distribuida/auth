@@ -151,5 +151,62 @@ public class UserController {
                 .build()
         );
     }
+
+    /**
+     * Busca usuário por Auth0 ID
+     * Endpoint interno para uso entre serviços
+     */
+    @GetMapping("/auth0/{auth0Id}")
+    @Timed(value = "users.get.by.auth0id", description = "Time taken to get user by auth0 id")
+    public ResponseEntity<ApiResponse<User>> getUserByAuth0Id(@PathVariable String auth0Id) {
+        log.info("GET /api/v1/users/auth0/{}", auth0Id);
+        
+        User user = userService.findByAuth0Id(auth0Id);
+        
+        return ResponseEntity.ok(
+            ApiResponse.<User>builder()
+                .success(true)
+                .message("Usuário encontrado")
+                .data(user)
+                .build()
+        );
+    }
+
+    /**
+     * Verifica se o usuário tem uma role específica
+     * Endpoint interno para uso entre serviços
+     */
+    @GetMapping("/{id}/has-role")
+    @Timed(value = "users.check.role", description = "Time taken to check user role")
+    public ResponseEntity<ApiResponse<Boolean>> hasRole(
+            @PathVariable Long id,
+            @RequestParam String role) {
+        log.info("GET /api/v1/users/{}/has-role?role={}", id, role);
+        
+        User user = userService.findById(id);
+        
+        UserRole userRole;
+        try {
+            userRole = UserRole.valueOf(role.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(
+                ApiResponse.<Boolean>builder()
+                    .success(true)
+                    .message("Role inválida")
+                    .data(false)
+                    .build()
+            );
+        }
+        
+        boolean hasRole = user.hasRole(userRole);
+        
+        return ResponseEntity.ok(
+            ApiResponse.<Boolean>builder()
+                .success(true)
+                .message("Verificação de role realizada")
+                .data(hasRole)
+                .build()
+        );
+    }
 }
 

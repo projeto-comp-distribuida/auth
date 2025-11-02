@@ -7,6 +7,7 @@ import com.distrischool.template.dto.auth.LoginRequest;
 import com.distrischool.template.dto.auth.RegisterRequest;
 import com.distrischool.template.entity.Role;
 import com.distrischool.template.entity.User;
+import com.distrischool.template.entity.UserRole;
 import com.distrischool.template.exception.BusinessException;
 import com.distrischool.template.kafka.auth.Auth0EventProducer;
 import com.distrischool.template.repository.RoleRepository;
@@ -32,6 +33,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final Auth0ManagementService auth0ManagementService;
     private final Auth0EventProducer auth0EventProducer;
+    private final EnhancedJwtService enhancedJwtService;
 
     /**
      * Realiza login de um usuário via Auth0
@@ -196,9 +198,13 @@ public class AuthService {
     }
 
     /**
-     * Constrói resposta de autenticação com token
+     * Constrói resposta de autenticação com token enriquecido
+     * O token inclui todos os claims do Auth0 + roles e permissions do banco de dados
      */
-    private AuthResponse buildAuthResponseWithToken(User user, String token) {
+    private AuthResponse buildAuthResponseWithToken(User user, String auth0Token) {
+        // Gera token enriquecido com roles e permissions do DB
+        String enhancedToken = enhancedJwtService.generateEnhancedToken(auth0Token, user);
+        
         AuthResponse.UserResponse userResponse = AuthResponse.UserResponse.builder()
             .id(user.getId())
             .email(user.getEmail())
@@ -217,9 +223,123 @@ public class AuthService {
             .build();
 
         return AuthResponse.builder()
-            .token(token)
+            .token(enhancedToken)
             .user(userResponse)
             .build();
+    }
+
+    /**
+     * Cria um usuário internamente (chamado por outros serviços)
+     * Gera uma senha temporária aleatória
+     */
+    @Transactional
+    public AuthResponse createUserInternal(com.distrischool.template.dto.auth.CreateUserInternalRequest request) {
+        log.info("Criando usuário interno: {}", request.getEmail());
+
+        // Valida se o email já existe
+        if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
+            throw new BusinessException("Email já cadastrado no sistema");
+        }
+
+        // Valida se o CPF já existe (se informado)
+        if (request.getDocumentNumber() != null && 
+            userRepository.existsByDocumentNumber(request.getDocumentNumber())) {
+            throw new BusinessException("CPF já cadastrado no sistema");
+        }
+
+        // Gera senha temporária aleatória
+        String temporaryPassword = generateTemporaryPassword();
+        
+        try {
+            // Parse role
+            UserRole userRole;
+            try {
+                userRole = UserRole.valueOf(request.getRole().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException("Role inválida: " + request.getRole());
+            }
+
+            // Criar usuário no Auth0 com senha temporária
+            Auth0ManagementService.Auth0User auth0User = auth0ManagementService.createUser(
+                request.getEmail(),
+                temporaryPassword,
+                request.getFirstName(),
+                request.getLastName(),
+                request.getPhone(),
+                request.getDocumentNumber(),
+                userRole
+            );
+
+            // Buscar role do banco local
+            Role role = roleRepository.findByName(userRole)
+                .orElseThrow(() -> new BusinessException("Role não encontrada: " + userRole));
+
+            // Criar usuário no banco local
+            User user = User.builder()
+                .email(auth0User.getEmail().toLowerCase().trim())
+                .firstName(auth0User.getFirstName() != null ? auth0User.getFirstName().trim() : request.getFirstName())
+                .lastName(auth0User.getLastName() != null ? auth0User.getLastName().trim() : request.getLastName())
+                .phone(request.getPhone())
+                .documentNumber(request.getDocumentNumber())
+                .auth0Id(auth0User.getAuth0Id())
+                .active(true)
+                .build();
+
+            user.addRole(role);
+            user.setCreatedBy("INTERNAL_SERVICE");
+            user.setUpdatedBy("INTERNAL_SERVICE");
+
+            User savedUser = userRepository.save(user);
+            log.info("Usuário criado internamente com sucesso: {}", savedUser.getEmail());
+
+            // Publicar evento de usuário criado
+            auth0EventProducer.publishUserCreated(
+                savedUser.getId(),
+                savedUser.getEmail(),
+                savedUser.getAuth0Id(),
+                savedUser.getFirstName(),
+                savedUser.getLastName()
+            );
+
+            return buildAuthResponse(savedUser);
+
+        } catch (Exception e) {
+            log.error("Erro ao criar usuário interno: {}", e.getMessage(), e);
+            throw new BusinessException("Falha ao criar usuário: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Gera uma senha temporária aleatória
+     */
+    private String generateTemporaryPassword() {
+        // Gera uma senha temporária aleatória com 16 caracteres
+        // Inclui letras maiúsculas, minúsculas, números e caracteres especiais
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@$!%*?&";
+        StringBuilder password = new StringBuilder();
+        java.util.Random random = new java.util.Random();
+        
+        // Garante pelo menos um de cada tipo
+        password.append((char) ('A' + random.nextInt(26))); // Maiúscula
+        password.append((char) ('a' + random.nextInt(26))); // Minúscula
+        password.append((char) ('0' + random.nextInt(10))); // Número
+        password.append("@$!%*?&".charAt(random.nextInt(7))); // Especial
+        
+        // Completa com caracteres aleatórios
+        for (int i = 4; i < 16; i++) {
+            password.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        
+        // Embaralha a senha
+        char[] passwordArray = password.toString().toCharArray();
+        for (int i = passwordArray.length - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            char temp = passwordArray[i];
+            passwordArray[i] = passwordArray[j];
+            passwordArray[j] = temp;
+        }
+        
+        return new String(passwordArray);
     }
 }
 

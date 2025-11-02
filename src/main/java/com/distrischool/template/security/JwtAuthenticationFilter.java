@@ -37,6 +37,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     
     @Autowired
     @Lazy
+    private EnhancedJwtValidator enhancedJwtValidator;
+    
+    @Autowired
+    @Lazy
     private UserRepository userRepository;
 
     @Override
@@ -64,8 +68,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // Valida com Auth0
-            authenticateWithAuth0(request, jwt);
+            // Tenta validar como token enriquecido primeiro, depois Auth0 (backwards compatibility)
+            if (!authenticateWithEnhancedToken(request, jwt)) {
+                authenticateWithAuth0(request, jwt);
+            }
 
         } catch (Exception e) {
             log.error("Erro ao processar token JWT: {}", e.getMessage());
@@ -76,7 +82,58 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Autentica usando token Auth0
+     * Autentica usando token enriquecido (com roles/permissions do DB)
+     * @return true se autenticou com sucesso, false caso contrário
+     */
+    private boolean authenticateWithEnhancedToken(HttpServletRequest request, String token) {
+        try {
+            // Valida o token enriquecido
+            DecodedJWT jwt = enhancedJwtValidator.validateToken(token);
+            
+            // Extrai informações do token
+            String auth0Id = enhancedJwtValidator.getAuth0Id(jwt);
+            String email = enhancedJwtValidator.getEmail(jwt);
+            List<String> roles = enhancedJwtValidator.getRoles(jwt);
+            List<String> permissions = enhancedJwtValidator.getPermissions(jwt);
+            
+            // Busca o usuário no banco (opcional, para pegar userId)
+            var user = userRepository.findByAuth0Id(auth0Id).orElse(null);
+            Long userId = user != null ? user.getId() : null;
+            
+            // Converte roles para authorities do Spring Security
+            List<SimpleGrantedAuthority> authorities = roles.stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .collect(Collectors.toList());
+            
+            // Adiciona permissions como authorities também
+            permissions.forEach(permission -> 
+                authorities.add(new SimpleGrantedAuthority(permission))
+            );
+
+            // Cria o objeto de autenticação
+            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                new UserPrincipal(userId, email, auth0Id),
+                null,
+                authorities
+            );
+            
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+            
+            log.debug("Usuário autenticado via token enriquecido: {} (auth0_id: {}) com roles: {} e permissions: {}", 
+                email, auth0Id, roles, permissions);
+            
+            return true;
+            
+        } catch (Exception e) {
+            // Token não é um token enriquecido válido, retorna false para tentar Auth0
+            log.debug("Token não é um token enriquecido válido, tentando Auth0: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Autentica usando token Auth0 (backwards compatibility)
      */
     private void authenticateWithAuth0(HttpServletRequest request, String token) {
         try {
