@@ -146,12 +146,12 @@ BEGIN
         
         -- Criar função para atualizar updated_at se não existir
         CREATE OR REPLACE FUNCTION update_updated_at_column()
-        RETURNS TRIGGER AS $$
+        RETURNS TRIGGER AS $function$
         BEGIN
             NEW.updated_at = CURRENT_TIMESTAMP;
             RETURN NEW;
         END;
-        $$ language 'plpgsql';
+        $function$ language plpgsql;
         
         -- Criar trigger para system_config
         DROP TRIGGER IF EXISTS update_system_config_updated_at ON system_config;
