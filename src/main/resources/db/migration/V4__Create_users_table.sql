@@ -5,8 +5,8 @@
 -- Data: 2025-10-08
 -- =====================================================
 
--- Criação da tabela de usuários
-CREATE TABLE users (
+-- Criação da tabela de usuários (idempotente)
+CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255),
@@ -58,10 +58,10 @@ COMMENT ON COLUMN users.updated_by IS 'Usuário que atualizou o registro';
 COMMENT ON COLUMN users.deleted_at IS 'Data de exclusão lógica do registro';
 COMMENT ON COLUMN users.deleted_by IS 'Usuário que excluiu o registro';
 
--- Índices para otimizar consultas
-CREATE INDEX idx_user_email ON users(email);
-CREATE INDEX idx_user_auth0_id ON users(auth0_id);
-CREATE INDEX idx_user_document_number ON users(document_number);
-CREATE INDEX idx_user_active ON users(active);
-CREATE INDEX idx_user_deleted_at ON users(deleted_at);
+-- Índices para otimizar consultas (idempotentes)
+CREATE INDEX IF NOT EXISTS idx_user_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_user_auth0_id ON users(auth0_id);
+CREATE INDEX IF NOT EXISTS idx_user_document_number ON users(document_number);
+CREATE INDEX IF NOT EXISTS idx_user_active ON users(active);
+CREATE INDEX IF NOT EXISTS idx_user_deleted_at ON users(deleted_at);
 

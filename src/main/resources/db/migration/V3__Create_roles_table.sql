@@ -5,8 +5,8 @@
 -- Data: 2025-10-08
 -- =====================================================
 
--- Criação da tabela de roles
-CREATE TABLE roles (
+-- Criação da tabela de roles (idempotente)
+CREATE TABLE IF NOT EXISTS roles (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(50) NOT NULL UNIQUE,
     description VARCHAR(500),

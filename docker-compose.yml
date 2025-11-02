@@ -145,6 +145,9 @@ services:
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
       SPRING_FLYWAY_IGNORE_MISSING_MIGRATIONS: "true"
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_CLEAN_ON_VALIDATION_ERROR: "true"
+      SPRING_FLYWAY_OUT_OF_ORDER: "false"
       # Configurações Auth0 (OAuth2) - Auth0 gerencia completamente os JWT tokens
       AUTH0_ENABLED: ${AUTH0_ENABLED:-true}
       AUTH0_DOMAIN: ${AUTH0_DOMAIN}
