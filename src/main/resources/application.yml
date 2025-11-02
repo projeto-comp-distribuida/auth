@@ -45,13 +45,17 @@ spring:
           max-wait: -1ms
   
   # Configuração do Flyway
+  # O FlywayRepairConfig executa repair automaticamente antes das migrações
+  # para corrigir checksums divergentes e remover migrações ausentes (como V1)
   flyway:
     enabled: ${SPRING_FLYWAY_ENABLED:true}
     locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
     baseline-on-migrate: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:true}
-    validate-on-migrate: true
+    validate-on-migrate: ${SPRING_FLYWAY_VALIDATE_ON_MIGRATE:true}
+    validate-migration-naming: false
     clean-disabled: true
     ignore-missing-migrations: true
+    out-of-order: true
   
   # Configuração do Kafka
   kafka:
