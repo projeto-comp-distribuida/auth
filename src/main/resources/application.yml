@@ -72,6 +72,7 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
       retries: 3
+      compression-type: ${SPRING_KAFKA_PRODUCER_COMPRESSION_TYPE:gzip}
     
   # Configuração do Jackson
   jackson:

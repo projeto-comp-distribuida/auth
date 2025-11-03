@@ -32,11 +32,10 @@ COMMENT ON COLUMN roles.updated_by IS 'Usuário que atualizou o registro';
 COMMENT ON COLUMN roles.deleted_at IS 'Data de exclusão lógica do registro';
 COMMENT ON COLUMN roles.deleted_by IS 'Usuário que excluiu o registro';
 
--- Inserção dos 4 perfis de acesso padrão do sistema (idempotente)
+-- Inserção dos 4 perfis de acesso padrão do sistema
 INSERT INTO roles (name, description, active, created_by) VALUES
     ('ADMIN', 'Administrador do Sistema - Acesso total ao sistema', true, 'SYSTEM'),
     ('TEACHER', 'Professor - Acesso para gerenciar turmas, alunos, notas e avaliações', true, 'SYSTEM'),
     ('STUDENT', 'Estudante/Aluno - Acesso para visualizar notas, horários e materiais', true, 'SYSTEM'),
-    ('PARENT', 'Pai/Responsável - Acesso para acompanhar o desempenho dos filhos', true, 'SYSTEM')
-ON CONFLICT (name) DO NOTHING;
+    ('PARENT', 'Pai/Responsável - Acesso para acompanhar o desempenho dos filhos', true, 'SYSTEM');
 
