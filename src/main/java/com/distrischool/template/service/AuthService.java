@@ -33,7 +33,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final Auth0ManagementService auth0ManagementService;
     private final Auth0EventProducer auth0EventProducer;
-    private final EnhancedJwtService enhancedJwtService;
+    // EnhancedJwtService removido - agora retornamos token Auth0 RS256 diretamente
 
     /**
      * Realiza login de um usuário via Auth0
@@ -198,12 +198,19 @@ public class AuthService {
     }
 
     /**
-     * Constrói resposta de autenticação com token enriquecido
-     * O token inclui todos os claims do Auth0 + roles e permissions do banco de dados
+     * Constrói resposta de autenticação com token Auth0 RS256
+     * Retorna o token Auth0 diretamente (RS256) para compatibilidade com serviços que validam via JWKS
+     * Roles e permissions estão incluídos no objeto user na resposta
+     * 
+     * IMPORTANTE: Para incluir roles/permissions no token JWT, configure Auth0 RBAC:
+     * 1. Enable RBAC in Auth0 Dashboard → APIs → Your API → Settings → Enable RBAC
+     * 2. Assign roles to users via Management API or Dashboard
+     * 3. Add "Add Permissions in the Access Token" option
+     * 4. Roles/permissions will then be included automatically in Auth0 tokens
      */
     private AuthResponse buildAuthResponseWithToken(User user, String auth0Token) {
-        // Gera token enriquecido com roles e permissions do DB
-        String enhancedToken = enhancedJwtService.generateEnhancedToken(auth0Token, user);
+        // Retorna o token Auth0 diretamente (RS256) - validado via JWKS pelos serviços downstream
+        // NÃO cria um novo token HS256, pois serviços como notifications esperam RS256
         
         AuthResponse.UserResponse userResponse = AuthResponse.UserResponse.builder()
             .id(user.getId())
@@ -223,7 +230,7 @@ public class AuthService {
             .build();
 
         return AuthResponse.builder()
-            .token(enhancedToken)
+            .token(auth0Token) // Token Auth0 RS256 diretamente
             .user(userResponse)
             .build();
     }

@@ -72,7 +72,8 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
       retries: 3
-      compression-type: ${SPRING_KAFKA_PRODUCER_COMPRESSION_TYPE:gzip}
+      # Desabilitar compressão para evitar problemas com Snappy no consumer
+      compression-type: ${SPRING_KAFKA_PRODUCER_COMPRESSION_TYPE:none}
     
   # Configuração do Jackson
   jackson:
@@ -206,3 +207,7 @@ app:
     secret: ${JWT_SECRET:default-secret-key-change-in-production-minimum-256-bits}
     # Tempo de expiração do token em horas (padrão: 24 horas)
     expiration-hours: ${JWT_EXPIRATION_HOURS:24}
+
+  internal:
+    # Token compartilhado para autenticar chamadas internas entre serviços
+    shared-token: ${INTERNAL_SHARED_TOKEN:}

@@ -102,6 +102,7 @@ public class Auth0ManagementService {
             loginData.put("grant_type", "http://auth0.com/oauth/grant-type/password-realm");
             loginData.put("username", email);
             loginData.put("password", password);
+            // Request roles and permissions in token scope (requires Auth0 RBAC configuration)
             loginData.put("scope", "openid profile email");
             loginData.put("realm", auth0Config.getConnection());
             
