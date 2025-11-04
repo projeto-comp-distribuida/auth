@@ -48,8 +48,12 @@ public class Auth0ManagementService {
             // Adicionar metadados customizados
             Map<String, Object> userMetadata = new HashMap<>();
             userMetadata.put("document_number", documentNumber);
-            userMetadata.put("role", role.name());
             userData.put("user_metadata", userMetadata);
+            
+            // Adicionar app_metadata com role (apenas aplicação pode modificar)
+            Map<String, Object> appMetadata = new HashMap<>();
+            appMetadata.put("role", role.name());
+            userData.put("app_metadata", appMetadata);
             
             // Fazer requisição para criar usuário
             HttpHeaders headers = new HttpHeaders();
@@ -102,7 +106,6 @@ public class Auth0ManagementService {
             loginData.put("grant_type", "http://auth0.com/oauth/grant-type/password-realm");
             loginData.put("username", email);
             loginData.put("password", password);
-            // Request roles and permissions in token scope (requires Auth0 RBAC configuration)
             loginData.put("scope", "openid profile email");
             loginData.put("realm", auth0Config.getConnection());
             

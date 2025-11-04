@@ -207,7 +207,3 @@ app:
     secret: ${JWT_SECRET:default-secret-key-change-in-production-minimum-256-bits}
     # Tempo de expiração do token em horas (padrão: 24 horas)
     expiration-hours: ${JWT_EXPIRATION_HOURS:24}
-
-  internal:
-    # Token compartilhado para autenticar chamadas internas entre serviços
-    shared-token: ${INTERNAL_SHARED_TOKEN:}

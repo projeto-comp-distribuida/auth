@@ -33,7 +33,6 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final Auth0ManagementService auth0ManagementService;
     private final Auth0EventProducer auth0EventProducer;
-    // EnhancedJwtService removido - agora retornamos token Auth0 RS256 diretamente
 
     /**
      * Realiza login de um usuário via Auth0
@@ -67,8 +66,8 @@ public class AuthService {
             // 5. Publicar evento de login
             auth0EventProducer.publishUserLogged(user.getId(), user.getEmail(), user.getAuth0Id());
             
-            // 6. Construir resposta com token
-            return buildAuthResponseWithToken(user, auth0Response.getAccessToken());
+            // 6. Construir resposta com token Auth0 diretamente
+            return buildAuthResponseWithAuth0Token(user, auth0Response.getAccessToken());
 
         } catch (Exception e) {
             log.error("Erro ao fazer login: {}", e.getMessage());
@@ -198,20 +197,10 @@ public class AuthService {
     }
 
     /**
-     * Constrói resposta de autenticação com token Auth0 RS256
-     * Retorna o token Auth0 diretamente (RS256) para compatibilidade com serviços que validam via JWKS
-     * Roles e permissions estão incluídos no objeto user na resposta
-     * 
-     * IMPORTANTE: Para incluir roles/permissions no token JWT, configure Auth0 RBAC:
-     * 1. Enable RBAC in Auth0 Dashboard → APIs → Your API → Settings → Enable RBAC
-     * 2. Assign roles to users via Management API or Dashboard
-     * 3. Add "Add Permissions in the Access Token" option
-     * 4. Roles/permissions will then be included automatically in Auth0 tokens
+     * Constrói resposta de autenticação com token Auth0 diretamente
+     * Retorna o token Auth0 original sem modificações
      */
-    private AuthResponse buildAuthResponseWithToken(User user, String auth0Token) {
-        // Retorna o token Auth0 diretamente (RS256) - validado via JWKS pelos serviços downstream
-        // NÃO cria um novo token HS256, pois serviços como notifications esperam RS256
-        
+    private AuthResponse buildAuthResponseWithAuth0Token(User user, String auth0Token) {
         AuthResponse.UserResponse userResponse = AuthResponse.UserResponse.builder()
             .id(user.getId())
             .email(user.getEmail())
@@ -230,7 +219,7 @@ public class AuthService {
             .build();
 
         return AuthResponse.builder()
-            .token(auth0Token) // Token Auth0 RS256 diretamente
+            .token(auth0Token) // Retorna o token Auth0 diretamente
             .user(userResponse)
             .build();
     }
