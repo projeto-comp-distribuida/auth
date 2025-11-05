@@ -68,6 +68,8 @@
         </dependency>
         
         <!-- Spring Kafka -->
+        <!-- Includes Snappy support for compression/decompression -->
+        <!-- The Kafka client library manages the correct Snappy version -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>

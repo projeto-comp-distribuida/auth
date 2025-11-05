@@ -177,6 +177,7 @@ services:
     # Remove o healthcheck para facilitar o desenvolvimento
     # O Spring Boot DevTools pode reiniciar frequentemente
 
+  
 networks:
   distrischool-network:
     driver: bridge
