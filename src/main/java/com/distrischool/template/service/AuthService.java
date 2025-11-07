@@ -306,6 +306,36 @@ public class AuthService {
     }
 
     /**
+     * Obtém informações do usuário autenticado atual
+     * 
+     * @param userId ID do usuário autenticado
+     * @return informações do usuário
+     */
+    public AuthResponse.UserResponse getCurrentUser(Long userId) {
+        log.info("Buscando informações do usuário atual: {}", userId);
+        
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new BusinessException("Usuário não encontrado"));
+        
+        return AuthResponse.UserResponse.builder()
+            .id(user.getId())
+            .email(user.getEmail())
+            .firstName(user.getFirstName())
+            .lastName(user.getLastName())
+            .phone(user.getPhone())
+            .documentNumber(user.getDocumentNumber())
+            .auth0Id(user.getAuth0Id())
+            .active(user.getActive())
+            .lastLogin(user.getLastLogin())
+            .roles(user.getRoles().stream()
+                .map(Role::getName)
+                .collect(Collectors.toSet()))
+            .createdAt(user.getCreatedAt())
+            .updatedAt(user.getUpdatedAt())
+            .build();
+    }
+
+    /**
      * Gera uma senha temporária aleatória
      */
     private String generateTemporaryPassword() {

@@ -4,6 +4,7 @@ import com.distrischool.template.dto.ApiResponse;
 import com.distrischool.template.dto.auth.AuthResponse;
 import com.distrischool.template.dto.auth.LoginRequest;
 import com.distrischool.template.dto.auth.RegisterRequest;
+import com.distrischool.template.security.UserPrincipal;
 import com.distrischool.template.service.AuthService;
 import io.micrometer.core.annotation.Timed;
 import jakarta.validation.Valid;
@@ -11,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -95,6 +98,49 @@ public class AuthController {
                 .data(authResponse)
                 .build()
             );
+    }
+
+    /**
+     * Endpoint para obter informações do usuário autenticado atual
+     * 
+     * @return informações do usuário autenticado
+     */
+    @GetMapping("/me")
+    @Timed(value = "auth.me", description = "Time taken to get current user info")
+    public ResponseEntity<ApiResponse<AuthResponse.UserResponse>> getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.<AuthResponse.UserResponse>builder()
+                    .success(false)
+                    .message("Usuário não autenticado")
+                    .build()
+                );
+        }
+        
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        
+        if (userPrincipal.getId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.<AuthResponse.UserResponse>builder()
+                    .success(false)
+                    .message("Usuário não encontrado no sistema")
+                    .build()
+                );
+        }
+        
+        log.info("GET /api/v1/auth/me - User ID: {}", userPrincipal.getId());
+        
+        AuthResponse.UserResponse userResponse = authService.getCurrentUser(userPrincipal.getId());
+        
+        return ResponseEntity.ok(
+            ApiResponse.<AuthResponse.UserResponse>builder()
+                .success(true)
+                .message("Informações do usuário obtidas com sucesso")
+                .data(userResponse)
+                .build()
+        );
     }
 }
 
