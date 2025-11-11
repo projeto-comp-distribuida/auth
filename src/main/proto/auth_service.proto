@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package com.distrischool.auth.grpc;
 
-option java_package = "com.distrischool.template.grpc";
+option java_package = "com.distrischool.auth.grpc";
 option java_outer_classname = "AuthServiceProto";
 option java_multiple_files = true;
 

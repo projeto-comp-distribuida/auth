@@ -1,7 +1,7 @@
 # Perfil para execução no Docker Compose
 spring:
   application:
-    name: microservice-template
+    name: auth-service
   
   kafka:
     bootstrap-servers: kafka:29092

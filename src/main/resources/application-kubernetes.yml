@@ -1,7 +1,7 @@
 # Perfil para execução no Kubernetes
 spring:
   application:
-    name: microservice-template
+    name: auth-service
   
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}

@@ -1,7 +1,7 @@
 # Configurações para testes
 spring:
   application:
-    name: microservice-template-test
+    name: auth-service-test
   
   kafka:
     bootstrap-servers: ${spring.embedded.kafka.brokers}
