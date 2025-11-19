@@ -4,6 +4,9 @@ import com.distrischool.template.dto.ApiResponse;
 import com.distrischool.template.dto.auth.AuthResponse;
 import com.distrischool.template.dto.auth.LoginRequest;
 import com.distrischool.template.dto.auth.RegisterRequest;
+import com.distrischool.template.dto.auth.ForgotPasswordRequest;
+import com.distrischool.template.dto.auth.ResetPasswordRequest;
+import com.distrischool.template.dto.auth.VerifyEmailRequest;
 import com.distrischool.template.security.UserPrincipal;
 import com.distrischool.template.service.AuthService;
 import io.micrometer.core.annotation.Timed;
@@ -40,7 +43,12 @@ public class AuthController {
      * @return token JWT e informações do usuário
      */
     @PostMapping("/login")
-    @Timed(value = "auth.login", description = "Time taken to login")
+    @Timed(
+        value = "auth.login",
+        description = "Time taken to login",
+        percentiles = {0.5, 0.9, 0.95, 0.99},
+        histogram = true
+    )
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
         log.info("POST /api/v1/auth/login - Email: {}", request.getEmail());
         
@@ -62,7 +70,12 @@ public class AuthController {
      * @return informações do usuário criado
      */
     @PostMapping("/register")
-    @Timed(value = "auth.register", description = "Time taken to register")
+    @Timed(
+        value = "auth.register",
+        description = "Time taken to register",
+        percentiles = {0.5, 0.9, 0.95, 0.99},
+        histogram = true
+    )
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
         log.info("POST /api/v1/auth/register - Email: {}", request.getEmail());
         
@@ -85,7 +98,12 @@ public class AuthController {
      * @return informações do usuário criado
      */
     @PostMapping("/internal/users")
-    @Timed(value = "auth.internal.createUser", description = "Time taken to create user internally")
+    @Timed(
+        value = "auth.internal.createUser",
+        description = "Time taken to create user internally",
+        percentiles = {0.5, 0.9, 0.95, 0.99},
+        histogram = true
+    )
     public ResponseEntity<ApiResponse<AuthResponse>> createUserInternal(@RequestBody com.distrischool.template.dto.auth.CreateUserInternalRequest request) {
         log.info("POST /api/v1/auth/internal/users - Email: {}", request.getEmail());
         
@@ -106,7 +124,12 @@ public class AuthController {
      * @return informações do usuário autenticado
      */
     @GetMapping("/me")
-    @Timed(value = "auth.me", description = "Time taken to get current user info")
+    @Timed(
+        value = "auth.me",
+        description = "Time taken to get current user info",
+        percentiles = {0.5, 0.9, 0.95, 0.99},
+        histogram = true
+    )
     public ResponseEntity<ApiResponse<AuthResponse.UserResponse>> getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         
@@ -139,6 +162,98 @@ public class AuthController {
                 .success(true)
                 .message("Informações do usuário obtidas com sucesso")
                 .data(userResponse)
+                .build()
+        );
+    }
+
+    /**
+     * Endpoint para solicitar reset de senha via Auth0
+     */
+    @PostMapping("/forgot-password")
+    @Timed(
+        value = "auth.forgotPassword",
+        description = "Time taken to request password reset",
+        percentiles = {0.5, 0.9, 0.95, 0.99},
+        histogram = true
+    )
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("POST /api/v1/auth/forgot-password - Email: {}", request.getEmail());
+
+        authService.initiatePasswordReset(request.getEmail());
+
+        return ResponseEntity.ok(
+            ApiResponse.<Void>builder()
+                .success(true)
+                .message("Se o email estiver cadastrado, enviaremos instruções para redefinir a senha.")
+                .build()
+        );
+    }
+
+    /**
+     * Endpoint para resetar senha usando token
+     */
+    @PostMapping("/reset-password")
+    @Timed(
+        value = "auth.resetPassword",
+        description = "Time taken to reset password",
+        percentiles = {0.5, 0.9, 0.95, 0.99},
+        histogram = true
+    )
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        log.info("POST /api/v1/auth/reset-password");
+
+        authService.resetPassword(request.getToken(), request.getNewPassword(), request.getConfirmPassword());
+
+        return ResponseEntity.ok(
+            ApiResponse.<Void>builder()
+                .success(true)
+                .message("Senha redefinida com sucesso.")
+                .build()
+        );
+    }
+
+    /**
+     * Endpoint para verificar email usando token (POST)
+     */
+    @PostMapping("/verify-email")
+    @Timed(
+        value = "auth.verifyEmail",
+        description = "Time taken to verify email",
+        percentiles = {0.5, 0.9, 0.95, 0.99},
+        histogram = true
+    )
+    public ResponseEntity<ApiResponse<Void>> verifyEmailPost(@Valid @RequestBody VerifyEmailRequest request) {
+        log.info("POST /api/v1/auth/verify-email");
+
+        authService.verifyEmail(request.getToken());
+
+        return ResponseEntity.ok(
+            ApiResponse.<Void>builder()
+                .success(true)
+                .message("Email verificado com sucesso.")
+                .build()
+        );
+    }
+
+    /**
+     * Endpoint para verificar email usando token (GET - para links em emails)
+     */
+    @GetMapping("/verify-email/{token}")
+    @Timed(
+        value = "auth.verifyEmail",
+        description = "Time taken to verify email",
+        percentiles = {0.5, 0.9, 0.95, 0.99},
+        histogram = true
+    )
+    public ResponseEntity<ApiResponse<Void>> verifyEmailGet(@PathVariable String token) {
+        log.info("GET /api/v1/auth/verify-email/{}", token);
+
+        authService.verifyEmail(token);
+
+        return ResponseEntity.ok(
+            ApiResponse.<Void>builder()
+                .success(true)
+                .message("Email verificado com sucesso.")
                 .build()
         );
     }

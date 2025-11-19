@@ -1,5 +1,6 @@
 package com.distrischool.template.kafka.auth;
 
+import com.distrischool.template.metrics.AuthMetricsRecorder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -22,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 public class Auth0EventProducer {
 
     private final KafkaTemplate<String, AuthEvent> kafkaTemplate;
+    private final AuthMetricsRecorder metricsRecorder;
     
     // Tópicos específicos para eventos de autenticação
     private static final String USER_CREATED_TOPIC = "distrischool.auth.user.created";
@@ -112,19 +114,26 @@ public class Auth0EventProducer {
     private void sendEvent(String topic, AuthEvent event) {
         log.info("Enviando evento de autenticação Auth0 para tópico '{}': {}", topic, event.getEventType());
         
-        CompletableFuture<SendResult<String, AuthEvent>> future = 
-            kafkaTemplate.send(topic, event.getEventId(), event);
-        
-        future.whenComplete((result, ex) -> {
-            if (ex == null) {
-                log.info("Evento de autenticação Auth0 enviado com sucesso. Tópico: {}, Partition: {}, Offset: {}",
-                        result.getRecordMetadata().topic(),
-                        result.getRecordMetadata().partition(),
-                        result.getRecordMetadata().offset());
-            } else {
-                log.error("Erro ao enviar evento de autenticação Auth0 para o tópico '{}': {}", 
-                        topic, ex.getMessage(), ex);
-            }
-        });
+        try {
+            CompletableFuture<SendResult<String, AuthEvent>> future =
+                kafkaTemplate.send(topic, event.getEventId(), event);
+
+            future.whenComplete((result, ex) -> {
+                if (ex == null) {
+                    log.info("Evento de autenticação Auth0 enviado com sucesso. Tópico: {}, Partition: {}, Offset: {}",
+                            result.getRecordMetadata().topic(),
+                            result.getRecordMetadata().partition(),
+                            result.getRecordMetadata().offset());
+                    metricsRecorder.recordAuthEvent(event.getEventType(), "success");
+                } else {
+                    log.error("Erro ao enviar evento de autenticação Auth0 para o tópico '{}': {}",
+                            topic, ex.getMessage(), ex);
+                    metricsRecorder.recordAuthEvent(event.getEventType(), "failure");
+                }
+            });
+        } catch (Exception ex) {
+            metricsRecorder.recordAuthEvent(event.getEventType(), "failure");
+            log.error("Erro ao enviar evento de autenticação Auth0 para o tópico '{}': {}", topic, ex.getMessage(), ex);
+        }
     }
 }

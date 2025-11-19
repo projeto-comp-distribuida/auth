@@ -109,6 +109,18 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
+> Prometheus estará disponível em `http://localhost:9090` e Grafana em `http://localhost:3001`.
+
+### 2.1 Monitoramento Local
+
+- **Prometheus**: já configurado para coletar `microservice-auth-dev` em `/actuator/prometheus`. A UI web permite explorar as métricas `auth_operations_total`, `auth_role_assignments_total` e `auth_events_total`.
+- **Grafana**: datasource Prometheus provisionado automaticamente (login padrão `admin` / `admin`, configurável via `GRAFANA_ADMIN_USER` e `GRAFANA_ADMIN_PASSWORD`).
+- **Alertas/Dashboards**: importe dashboards do Grafana Labs ou crie painéis personalizados para acompanhar autenticações, criação de usuários e falhas em eventos Kafka. Exemplos de consultas úteis:
+  - **Requisições por segundo (RPS)**: `rate(http_server_requests_seconds_count{uri!~"/actuator/.*"}[1m])`
+  - **Latência P95**: `histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m]))`
+  - **Tempo médio por endpoint de login**: `rate(auth_login_seconds_sum[5m]) / rate(auth_login_seconds_count[5m])`
+  - **Distribuição de status HTTP**: `sum(rate(http_server_requests_seconds_count[5m])) by (status)`
+
 ### 3. Desenvolvimento
 
 ```bash

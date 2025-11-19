@@ -10,6 +10,7 @@ import com.distrischool.template.entity.User;
 import com.distrischool.template.entity.UserRole;
 import com.distrischool.template.exception.BusinessException;
 import com.distrischool.template.kafka.auth.Auth0EventProducer;
+import com.distrischool.template.metrics.AuthMetricsRecorder;
 import com.distrischool.template.repository.RoleRepository;
 import com.distrischool.template.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,8 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final Auth0ManagementService auth0ManagementService;
     private final Auth0EventProducer auth0EventProducer;
+    private final AuthMetricsRecorder metricsRecorder;
+    private static final String FORGOT_PASSWORD_OPERATION = "forgot_password";
 
     /**
      * Realiza login de um usuário via Auth0
@@ -67,9 +70,16 @@ public class AuthService {
             auth0EventProducer.publishUserLogged(user.getId(), user.getEmail(), user.getAuth0Id());
             
             // 6. Construir resposta com token Auth0 diretamente
-            return buildAuthResponseWithAuth0Token(user, auth0Response.getAccessToken());
+            AuthResponse response = buildAuthResponseWithAuth0Token(user, auth0Response.getAccessToken());
+            metricsRecorder.recordOperation("login", "success");
+            metricsRecorder.recordRoleAssignments(user.getRoles(), "login");
+            return response;
 
+        } catch (BusinessException e) {
+            metricsRecorder.recordOperation("login", "failure");
+            throw e;
         } catch (Exception e) {
+            metricsRecorder.recordOperation("login", "failure");
             log.error("Erro ao fazer login: {}", e.getMessage());
             throw new BusinessException("Falha na autenticação: " + e.getMessage());
         }
@@ -84,17 +94,20 @@ public class AuthService {
 
         // Valida se as senhas coincidem
         if (!request.isPasswordMatching()) {
+            metricsRecorder.recordOperation("register", "failure");
             throw new BusinessException("As senhas não coincidem");
         }
 
         // Valida se o email já existe no banco local
         if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
+            metricsRecorder.recordOperation("register", "failure");
             throw new BusinessException("Email já cadastrado no sistema");
         }
 
         // Valida se o CPF já existe (se informado)
         if (request.getDocumentNumber() != null && 
             userRepository.existsByDocumentNumber(request.getDocumentNumber())) {
+            metricsRecorder.recordOperation("register", "failure");
             throw new BusinessException("CPF já cadastrado no sistema");
         }
 
@@ -105,11 +118,95 @@ public class AuthService {
             publishUserCreatedEvent(savedUser);
 
             // Construir resposta
-            return buildAuthResponse(savedUser);
+            AuthResponse response = buildAuthResponse(savedUser);
+            metricsRecorder.recordOperation("register", "success");
+            metricsRecorder.recordRoleAssignments(savedUser.getRoles(), "registration");
+            return response;
 
+        } catch (BusinessException e) {
+            metricsRecorder.recordOperation("register", "failure");
+            throw e;
         } catch (Exception e) {
+            metricsRecorder.recordOperation("register", "failure");
             log.error("Erro ao registrar usuário: {}", e.getMessage(), e);
             throw new BusinessException("Falha ao registrar usuário: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Inicia processo de recuperação de senha via Auth0
+     *
+     * @param email email do usuário
+     */
+    public void initiatePasswordReset(String email) {
+        log.info("Solicitando reset de senha para email: {}", email);
+
+        try {
+            auth0ManagementService.sendPasswordResetEmail(email);
+            metricsRecorder.recordOperation(FORGOT_PASSWORD_OPERATION, "success");
+        } catch (BusinessException e) {
+            metricsRecorder.recordOperation(FORGOT_PASSWORD_OPERATION, "failure");
+            throw e;
+        } catch (Exception e) {
+            metricsRecorder.recordOperation(FORGOT_PASSWORD_OPERATION, "failure");
+            log.error("Erro ao solicitar reset de senha para {}: {}", email, e.getMessage());
+            throw new BusinessException("Não foi possível processar a recuperação de senha.");
+        }
+    }
+
+    /**
+     * Reseta a senha de um usuário usando token de reset
+     *
+     * @param token token de reset de senha
+     * @param newPassword nova senha
+     * @param confirmPassword confirmação da nova senha
+     */
+    public void resetPassword(String token, String newPassword, String confirmPassword) {
+        log.info("Resetando senha com token");
+
+        // Validar se as senhas coincidem
+        if (!newPassword.equals(confirmPassword)) {
+            metricsRecorder.recordOperation("reset_password", "failure");
+            throw new BusinessException("As senhas não coincidem");
+        }
+
+        // Validar força da senha
+        if (newPassword.length() < 8) {
+            metricsRecorder.recordOperation("reset_password", "failure");
+            throw new BusinessException("A senha deve ter no mínimo 8 caracteres");
+        }
+
+        try {
+            auth0ManagementService.resetPassword(token, newPassword);
+            metricsRecorder.recordOperation("reset_password", "success");
+        } catch (BusinessException e) {
+            metricsRecorder.recordOperation("reset_password", "failure");
+            throw e;
+        } catch (Exception e) {
+            metricsRecorder.recordOperation("reset_password", "failure");
+            log.error("Erro ao resetar senha: {}", e.getMessage());
+            throw new BusinessException("Não foi possível resetar a senha. Token inválido ou expirado.");
+        }
+    }
+
+    /**
+     * Verifica o email de um usuário usando token de verificação
+     *
+     * @param token token de verificação de email
+     */
+    public void verifyEmail(String token) {
+        log.info("Verificando email com token");
+
+        try {
+            auth0ManagementService.verifyEmail(token);
+            metricsRecorder.recordOperation("verify_email", "success");
+        } catch (BusinessException e) {
+            metricsRecorder.recordOperation("verify_email", "failure");
+            throw e;
+        } catch (Exception e) {
+            metricsRecorder.recordOperation("verify_email", "failure");
+            log.error("Erro ao verificar email: {}", e.getMessage());
+            throw new BusinessException("Não foi possível verificar o email. Token inválido ou expirado.");
         }
     }
     
@@ -234,12 +331,14 @@ public class AuthService {
 
         // Valida se o email já existe
         if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
+            metricsRecorder.recordOperation("create_internal_user", "failure");
             throw new BusinessException("Email já cadastrado no sistema");
         }
 
         // Valida se o CPF já existe (se informado)
         if (request.getDocumentNumber() != null && 
             userRepository.existsByDocumentNumber(request.getDocumentNumber())) {
+            metricsRecorder.recordOperation("create_internal_user", "failure");
             throw new BusinessException("CPF já cadastrado no sistema");
         }
 
@@ -252,6 +351,7 @@ public class AuthService {
             try {
                 userRole = UserRole.valueOf(request.getRole().toUpperCase());
             } catch (IllegalArgumentException e) {
+                metricsRecorder.recordOperation("create_internal_user", "failure");
                 throw new BusinessException("Role inválida: " + request.getRole());
             }
 
@@ -297,9 +397,16 @@ public class AuthService {
                 savedUser.getLastName()
             );
 
-            return buildAuthResponse(savedUser);
+            AuthResponse response = buildAuthResponse(savedUser);
+            metricsRecorder.recordOperation("create_internal_user", "success");
+            metricsRecorder.recordRoleAssignment(userRole.name(), "internal");
+            return response;
 
+        } catch (BusinessException e) {
+            metricsRecorder.recordOperation("create_internal_user", "failure");
+            throw e;
         } catch (Exception e) {
+            metricsRecorder.recordOperation("create_internal_user", "failure");
             log.error("Erro ao criar usuário interno: {}", e.getMessage(), e);
             throw new BusinessException("Falha ao criar usuário: " + e.getMessage());
         }

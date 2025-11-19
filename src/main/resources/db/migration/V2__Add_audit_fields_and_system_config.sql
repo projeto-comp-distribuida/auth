@@ -78,9 +78,9 @@ CREATE TRIGGER update_system_config_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- Inserir configurações padrão
-INSERT INTO system_config (config_key, config_value, description, created_by) VALUES 
-    ('app.version', '1.0.0', 'Versão da aplicação', 'system'),
-    ('app.environment', 'development', 'Ambiente de execução', 'system'),
-    ('kafka.enabled', 'true', 'Habilita integração com Kafka', 'system'),
-    ('redis.cache.ttl', '3600', 'TTL padrão do cache Redis em segundos', 'system')
+INSERT INTO system_config (config_key, config_value, description, created_by, updated_by, active, created_at, updated_at) VALUES 
+    ('app.version', '1.0.0', 'Versão da aplicação', 'system', 'system', true, NOW(), NOW()),
+    ('app.environment', 'development', 'Ambiente de execução', 'system', 'system', true, NOW(), NOW()),
+    ('kafka.enabled', 'true', 'Habilita integração com Kafka', 'system', 'system', true, NOW(), NOW()),
+    ('redis.cache.ttl', '3600', 'TTL padrão do cache Redis em segundos', 'system', 'system', true, NOW(), NOW())
 ON CONFLICT (config_key) DO NOTHING;

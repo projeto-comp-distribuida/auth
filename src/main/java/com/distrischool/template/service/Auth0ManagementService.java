@@ -1,5 +1,7 @@
 package com.distrischool.template.service;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import com.distrischool.template.config.Auth0Config;
 import com.distrischool.template.entity.UserRole;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -8,8 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,7 +30,6 @@ public class Auth0ManagementService {
     private final Auth0Config auth0Config;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-
     /**
      * Cria um novo usuário no Auth0
      */
@@ -87,9 +91,65 @@ public class Auth0ManagementService {
                 throw new RuntimeException("Falha ao criar usuário no Auth0: " + response.getBody());
             }
             
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.CONFLICT) {
+                log.warn("Usuário já existe no Auth0: {}. Tentando buscar usuário existente.", email);
+                Auth0User existingUser = findUserByEmail(email);
+                if (existingUser != null) {
+                    return existingUser;
+                }
+            }
+            log.error("Erro ao criar usuário no Auth0: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao criar usuário no Auth0", e);
         } catch (Exception e) {
             log.error("Erro ao criar usuário no Auth0: {}", e.getMessage(), e);
             throw new RuntimeException("Falha ao criar usuário no Auth0", e);
+        }
+    }
+
+    /**
+     * Busca um usuário existente no Auth0 pelo email
+     */
+    public Auth0User findUserByEmail(String email) {
+        try {
+            String accessToken = getManagementApiToken();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(accessToken);
+
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+
+            String url = String.format("https://%s/api/v2/users-by-email?email=%s",
+                    auth0Config.getDomain(),
+                    URLEncoder.encode(email, StandardCharsets.UTF_8));
+
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+
+            if (response.getStatusCode() == HttpStatus.OK) {
+                JsonNode arrayNode = objectMapper.readTree(response.getBody());
+                if (arrayNode.isArray() && arrayNode.size() > 0) {
+                    JsonNode userNode = arrayNode.get(0);
+                    log.info("Usuário existente localizado no Auth0 para {}: {}", email, userNode.get("user_id").asText());
+
+                    String givenName = userNode.hasNonNull("given_name") ? userNode.get("given_name").asText() : "";
+                    String familyName = userNode.hasNonNull("family_name") ? userNode.get("family_name").asText() : "";
+
+                    return Auth0User.builder()
+                            .auth0Id(userNode.get("user_id").asText())
+                            .email(userNode.get("email").asText())
+                            .firstName(givenName)
+                            .lastName(familyName)
+                            .emailVerified(userNode.get("email_verified").asBoolean())
+                            .build();
+                }
+            }
+
+            log.warn("Não foi possível localizar usuário existente no Auth0 para {}", email);
+            return null;
+        } catch (Exception e) {
+            log.error("Erro ao buscar usuário no Auth0 por email {}: {}", email, e.getMessage(), e);
+            return null;
         }
     }
 
@@ -138,6 +198,186 @@ public class Auth0ManagementService {
         } catch (Exception e) {
             log.error("Erro ao autenticar usuário: {}", e.getMessage());
             throw new RuntimeException("Falha na autenticação: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Solicita envio de email de redefinição de senha para um usuário
+     */
+    public void sendPasswordResetEmail(String email) {
+        try {
+            Map<String, String> payload = new HashMap<>();
+            payload.put("client_id", auth0Config.getClientId());
+            payload.put("email", email);
+            payload.put("connection", auth0Config.getConnection());
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
+
+            String url = String.format("https://%s/dbconnections/change_password", auth0Config.getDomain());
+            log.info("Solicitando reset de senha no Auth0 para {}", email);
+
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("Reset de senha solicitado com sucesso para {}. Resposta: {}", email, response.getBody());
+                return;
+            }
+
+            log.error("Falha ao solicitar reset de senha - Status: {}, Body: {}", response.getStatusCode(), response.getBody());
+            throw new RuntimeException("Falha ao solicitar reset de senha: " + response.getBody());
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.BAD_REQUEST || e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                log.warn("Auth0 não encontrou usuário para reset de senha: {} ({})", email, e.getResponseBodyAsString());
+                return; // Evita revelar se o email existe ou não
+            }
+            log.error("Erro ao solicitar reset de senha no Auth0: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao solicitar reset de senha", e);
+        } catch (Exception e) {
+            log.error("Erro inesperado ao solicitar reset de senha: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao solicitar reset de senha", e);
+        }
+    }
+
+    /**
+     * Reseta a senha de um usuário usando token de reset
+     * O token deve ser um JWT que contém informações do usuário (email ou auth0Id)
+     */
+    public void resetPassword(String token, String newPassword) {
+        try {
+            // Tentar decodificar o token para extrair informações do usuário
+            String auth0Id = null;
+            String email = null;
+            
+            try {
+                DecodedJWT decodedJWT = JWT.decode(token);
+                auth0Id = decodedJWT.getSubject();
+                email = decodedJWT.getClaim("email") != null ? decodedJWT.getClaim("email").asString() : null;
+                log.info("Token decodificado - auth0Id: {}, email: {}", auth0Id, email);
+            } catch (Exception e) {
+                log.warn("Não foi possível decodificar token como JWT: {}", e.getMessage());
+                // Se não for JWT, tentar usar o token como auth0Id diretamente
+                auth0Id = token;
+            }
+            
+            // Se não temos auth0Id, tentar buscar por email
+            if (auth0Id == null && email != null) {
+                Auth0User user = findUserByEmail(email);
+                if (user != null) {
+                    auth0Id = user.getAuth0Id();
+                }
+            }
+            
+            if (auth0Id == null) {
+                throw new RuntimeException("Não foi possível identificar o usuário a partir do token");
+            }
+            
+            // Obter token de acesso para Management API
+            String accessToken = getManagementApiToken();
+            
+            // Preparar dados para atualização
+            Map<String, String> updateData = new HashMap<>();
+            updateData.put("password", newPassword);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(accessToken);
+            
+            HttpEntity<Map<String, String>> request = new HttpEntity<>(updateData, headers);
+            
+            // URL para atualizar usuário específico
+            String url = String.format("https://%s/api/v2/users/%s", auth0Config.getDomain(), 
+                    URLEncoder.encode(auth0Id, StandardCharsets.UTF_8));
+            log.info("Resetando senha no Auth0 para usuário: {}", auth0Id);
+            
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.PATCH, request, String.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("Senha resetada com sucesso para usuário: {}", auth0Id);
+                return;
+            }
+            
+            log.error("Falha ao resetar senha - Status: {}, Body: {}", response.getStatusCode(), response.getBody());
+            throw new RuntimeException("Falha ao resetar senha: " + response.getBody());
+            
+        } catch (HttpClientErrorException e) {
+            log.error("Erro ao resetar senha no Auth0: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao resetar senha: " + e.getResponseBodyAsString(), e);
+        } catch (Exception e) {
+            log.error("Erro inesperado ao resetar senha: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao resetar senha", e);
+        }
+    }
+
+    /**
+     * Verifica o email de um usuário usando token de verificação
+     * O token deve ser um JWT que contém informações do usuário (email ou auth0Id)
+     */
+    public void verifyEmail(String token) {
+        try {
+            // Tentar decodificar o token para extrair informações do usuário
+            String auth0Id = null;
+            String email = null;
+            
+            try {
+                DecodedJWT decodedJWT = JWT.decode(token);
+                auth0Id = decodedJWT.getSubject();
+                email = decodedJWT.getClaim("email") != null ? decodedJWT.getClaim("email").asString() : null;
+                log.info("Token decodificado - auth0Id: {}, email: {}", auth0Id, email);
+            } catch (Exception e) {
+                log.warn("Não foi possível decodificar token como JWT: {}", e.getMessage());
+                // Se não for JWT, tentar usar o token como auth0Id diretamente
+                auth0Id = token;
+            }
+            
+            // Se não temos auth0Id, tentar buscar por email
+            if (auth0Id == null && email != null) {
+                Auth0User user = findUserByEmail(email);
+                if (user != null) {
+                    auth0Id = user.getAuth0Id();
+                }
+            }
+            
+            if (auth0Id == null) {
+                throw new RuntimeException("Não foi possível identificar o usuário a partir do token");
+            }
+            
+            // Obter token de acesso para Management API
+            String accessToken = getManagementApiToken();
+            
+            // Preparar dados para atualização
+            Map<String, Boolean> updateData = new HashMap<>();
+            updateData.put("email_verified", true);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(accessToken);
+            
+            HttpEntity<Map<String, Boolean>> request = new HttpEntity<>(updateData, headers);
+            
+            // URL para atualizar usuário específico
+            String url = String.format("https://%s/api/v2/users/%s", auth0Config.getDomain(), 
+                    URLEncoder.encode(auth0Id, StandardCharsets.UTF_8));
+            log.info("Verificando email no Auth0 para usuário: {}", auth0Id);
+            
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.PATCH, request, String.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("Email verificado com sucesso para usuário: {}", auth0Id);
+                return;
+            }
+            
+            log.error("Falha ao verificar email - Status: {}, Body: {}", response.getStatusCode(), response.getBody());
+            throw new RuntimeException("Falha ao verificar email: " + response.getBody());
+            
+        } catch (HttpClientErrorException e) {
+            log.error("Erro ao verificar email no Auth0: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao verificar email: " + e.getResponseBodyAsString(), e);
+        } catch (Exception e) {
+            log.error("Erro inesperado ao verificar email: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao verificar email", e);
         }
     }
 
