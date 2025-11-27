@@ -12,6 +12,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -96,7 +97,11 @@ public class Auth0ManagementService {
                 log.warn("Usuário já existe no Auth0: {}. Tentando buscar usuário existente.", email);
                 Auth0User existingUser = findUserByEmail(email);
                 if (existingUser != null) {
+                    log.info("Usuário existente encontrado e retornado: {}", email);
                     return existingUser;
+                } else {
+                    log.error("Usuário já existe no Auth0 mas não foi possível recuperá-lo: {}", email);
+                    throw new RuntimeException("Usuário já existe no Auth0, mas não foi possível recuperá-lo. Tente fazer login ou recuperar senha.", e);
                 }
             }
             log.error("Erro ao criar usuário no Auth0: {}", e.getMessage(), e);
@@ -120,9 +125,15 @@ public class Auth0ManagementService {
 
             HttpEntity<Void> request = new HttpEntity<>(headers);
 
-            String url = String.format("https://%s/api/v2/users-by-email?email=%s",
-                    auth0Config.getDomain(),
-                    URLEncoder.encode(email, StandardCharsets.UTF_8));
+            // Usar UriComponentsBuilder para construir a URL corretamente
+            // O Auth0 Management API espera o email sem codificação dupla
+            String url = UriComponentsBuilder.fromHttpUrl(String.format("https://%s/api/v2/users-by-email", auth0Config.getDomain()))
+                    .queryParam("email", email)
+                    .build()
+                    .toUriString();
+
+            log.info("Buscando usuário no Auth0 por email: {}", email);
+            log.info("URL da requisição: {}", url);
 
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
 
