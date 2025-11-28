@@ -39,5 +39,13 @@ public class AuthResponse {
         private Set<UserRole> roles;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+        /**
+         * ID do aluno no serviço de gestão de alunos (null se não for aluno)
+         */
+        private Long studentId;
+        /**
+         * ID do professor no serviço de gestão de professores (null se não for professor)
+         */
+        private Long teacherId;
     }
 }

@@ -182,6 +182,11 @@ logging:
 microservice:
   name: ${spring.application.name}
   version: 1.0.0
+  # URLs dos outros microserviços
+  student:
+    url: ${STUDENT_SERVICE_URL:http://localhost:8081}
+  teacher:
+    url: ${TEACHER_SERVICE_URL:http://localhost:8082}
   kafka:
     topics:
       # Tópicos específicos de autenticação

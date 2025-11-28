@@ -2,6 +2,7 @@ package com.distrischool.template.service;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.distrischool.template.dto.ApiResponse;
 import com.distrischool.template.dto.auth.AuthResponse;
 import com.distrischool.template.dto.auth.LoginRequest;
 import com.distrischool.template.dto.auth.RegisterRequest;
@@ -9,6 +10,8 @@ import com.distrischool.template.entity.Role;
 import com.distrischool.template.entity.User;
 import com.distrischool.template.entity.UserRole;
 import com.distrischool.template.exception.BusinessException;
+import com.distrischool.template.feign.StudentServiceClient;
+import com.distrischool.template.feign.TeacherServiceClient;
 import com.distrischool.template.kafka.auth.Auth0EventProducer;
 import com.distrischool.template.metrics.AuthMetricsRecorder;
 import com.distrischool.template.repository.RoleRepository;
@@ -18,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,6 +39,8 @@ public class AuthService {
     private final Auth0ManagementService auth0ManagementService;
     private final Auth0EventProducer auth0EventProducer;
     private final AuthMetricsRecorder metricsRecorder;
+    private final StudentServiceClient studentServiceClient;
+    private final TeacherServiceClient teacherServiceClient;
     private static final String FORGOT_PASSWORD_OPERATION = "forgot_password";
 
     /**
@@ -414,15 +420,51 @@ public class AuthService {
 
     /**
      * Obtém informações do usuário autenticado atual
+     * Enriquece a resposta com studentId e teacherId obtidos dos serviços correspondentes
      * 
      * @param userId ID do usuário autenticado
-     * @return informações do usuário
+     * @return informações do usuário incluindo studentId e teacherId se aplicável
      */
     public AuthResponse.UserResponse getCurrentUser(Long userId) {
         log.info("Buscando informações do usuário atual: {}", userId);
         
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException("Usuário não encontrado"));
+        
+        // Busca studentId e teacherId em paralelo usando o auth0Id
+        Long studentId = null;
+        Long teacherId = null;
+        
+        if (user.getAuth0Id() != null && !user.getAuth0Id().isEmpty()) {
+            try {
+                // Busca studentId
+                try {
+                    ApiResponse<Map<String, Long>> studentResponse = studentServiceClient.getStudentIdByAuth0Id(user.getAuth0Id());
+                    if (studentResponse != null && studentResponse.getData() != null && studentResponse.getData().containsKey("id")) {
+                        studentId = studentResponse.getData().get("id");
+                        log.debug("StudentId encontrado para usuário {}: {}", userId, studentId);
+                    }
+                } catch (Exception e) {
+                    log.warn("Erro ao buscar studentId para auth0Id {}: {}", user.getAuth0Id(), e.getMessage());
+                    // Não falha a requisição se o serviço de alunos não estiver disponível
+                }
+                
+                // Busca teacherId
+                try {
+                    ApiResponse<Map<String, Long>> teacherResponse = teacherServiceClient.getTeacherIdByAuth0Id(user.getAuth0Id());
+                    if (teacherResponse != null && teacherResponse.getData() != null && teacherResponse.getData().containsKey("id")) {
+                        teacherId = teacherResponse.getData().get("id");
+                        log.debug("TeacherId encontrado para usuário {}: {}", userId, teacherId);
+                    }
+                } catch (Exception e) {
+                    log.warn("Erro ao buscar teacherId para auth0Id {}: {}", user.getAuth0Id(), e.getMessage());
+                    // Não falha a requisição se o serviço de professores não estiver disponível
+                }
+            } catch (Exception e) {
+                log.error("Erro inesperado ao buscar studentId/teacherId para usuário {}: {}", userId, e.getMessage(), e);
+                // Continua sem os IDs se houver erro
+            }
+        }
         
         return AuthResponse.UserResponse.builder()
             .id(user.getId())
@@ -439,6 +481,8 @@ public class AuthService {
                 .collect(Collectors.toSet()))
             .createdAt(user.getCreatedAt())
             .updatedAt(user.getUpdatedAt())
+            .studentId(studentId)
+            .teacherId(teacherId)
             .build();
     }
 

@@ -288,6 +288,32 @@
 			"name": "User Management",
 			"item": [
 				{
+					"name": "Get Current User (Me)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"me"
+							]
+						},
+						"description": "Get current authenticated user information including studentId and teacherId if applicable. The response includes:\n- Basic user information (id, email, firstName, lastName, etc.)\n- studentId: ID of the student record if the user is a student (null otherwise)\n- teacherId: ID of the teacher record if the user is a teacher (null otherwise)\n\nThese IDs are resolved by calling the student and teacher services using the user's Auth0 ID."
+					},
+					"response": []
+				},
+				{
 					"name": "Get User by ID",
 					"request": {
 						"method": "GET",

@@ -51,10 +51,13 @@ public class SecurityConfig {
             
             // Configura autorização de requisições
             .authorizeHttpRequests(auth -> auth
-                // Endpoints públicos (autenticação e health checks)
+                // Endpoints públicos (autenticação, recuperação de senha e health checks)
                 .requestMatchers(
                     "/api/v1/auth/register",
                     "/api/v1/auth/login",
+                    "/api/v1/auth/forgot-password",
+                    "/api/v1/auth/reset-password",
+                    "/api/v1/auth/verify-email/**",
                     "/api/v1/auth/health",
                     "/actuator/**",
                     "/health",
